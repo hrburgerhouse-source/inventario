@@ -442,9 +442,26 @@ function htmlProductoCatalogo(p, inactivo = false) {
           <span class="slider-sw"></span>
         </label>
         <button class="btn btn-sm btn-secundario" onclick="abrirModalProducto('${p.id}')">Editar</button>
+        <button class="btn btn-sm btn-peligro" onclick="eliminarProducto('${p.id}', '${p.nombre.replace(/'/g, "\\'")}')">🗑</button>
       </div>
     </div>
   `;
+}
+
+async function eliminarProducto(id, nombre) {
+  if (!confirm(`¿Eliminar "${nombre}"?\n\nEsta acción no se puede deshacer. El historial de días anteriores no se verá afectado.`)) return;
+  mostrarSpinner();
+  try {
+    await db.collection('productos').doc(id).delete();
+    await cargarProductos();
+    renderCatalogo();
+    showToast(`"${nombre}" eliminado`, 'exito');
+  } catch (err) {
+    console.error(err);
+    showToast('Error al eliminar el producto', 'error');
+  } finally {
+    ocultarSpinner();
+  }
 }
 
 // ── Modal producto ─────────────────────────────────────────────────────────
