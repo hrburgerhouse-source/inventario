@@ -824,11 +824,6 @@ function renderAjustes() {
         <button class="btn btn-secundario btn-block" onclick="mostrarCambiarPinEncargado()">Configurar PIN de encargado</button>
       </div>
 
-      <div class="card" style="margin-bottom:12px;">
-        <div style="font-weight:700;margin-bottom:12px;">👤 Sesión</div>
-        <button class="btn btn-peligro btn-block" onclick="cerrarSesion()">Cerrar sesión</button>
-      </div>
-
       <div class="card">
         <div style="font-weight:700;margin-bottom:12px;">🔗 Navegación</div>
         <a href="index.html" class="btn btn-secundario btn-block" style="text-decoration:none;">
