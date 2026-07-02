@@ -130,7 +130,7 @@ function cambiarTab(tab) {
   if (tab === 'inventario') renderInventario();
   else if (tab === 'historial') renderHistorial();
   else if (tab === 'catalogo') renderCatalogo();
-  // 'ajustes' es HTML estático
+  else if (tab === 'ajustes') renderAjustes();
 }
 
 // ── Cargar productos ───────────────────────────────────────────────────────
@@ -789,6 +789,43 @@ async function importarCatalogo() {
   } finally {
     ocultarSpinner();
   }
+}
+
+// ── TAB: Ajustes ───────────────────────────────────────────────────────────
+
+function renderAjustes() {
+  const container = document.getElementById('tab-ajustes');
+  container.innerHTML = `
+    <div style="padding:14px;">
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-weight:700;margin-bottom:12px;">🔒 PIN de administrador</div>
+        <p style="font-size:0.82rem;color:var(--texto-muted);margin-bottom:12px;">
+          El PIN por defecto es <strong>1234</strong>. Acceso completo al panel.
+        </p>
+        <button class="btn btn-primario btn-block" onclick="mostrarCambiarPin()">Cambiar PIN de administrador</button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-weight:700;margin-bottom:12px;">🔑 PIN de encargado</div>
+        <p style="font-size:0.82rem;color:var(--texto-muted);margin-bottom:12px;">
+          Acceso limitado: puede ver inventario, reabrir turnos y gestionar catálogo, pero <strong>no puede eliminar</strong> datos ni cambiar PINs.
+        </p>
+        <button class="btn btn-secundario btn-block" onclick="mostrarCambiarPinEncargado()">Configurar PIN de encargado</button>
+      </div>
+
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-weight:700;margin-bottom:12px;">👤 Sesión</div>
+        <button class="btn btn-peligro btn-block" onclick="cerrarSesion()">Cerrar sesión</button>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:12px;">🔗 Navegación</div>
+        <a href="index.html" class="btn btn-secundario btn-block" style="text-decoration:none;">
+          ← Ir a vista de empleado
+        </a>
+      </div>
+    </div>
+  `;
 }
 
 // ── Cambio de PIN ──────────────────────────────────────────────────────────
