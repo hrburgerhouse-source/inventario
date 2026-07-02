@@ -1,4 +1,4 @@
-const CACHE = 'hr-inventario-v2';
+const CACHE = 'hr-inventario-v3';
 const ASSETS = [
   './index.html',
   './admin.html',
