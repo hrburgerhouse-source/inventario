@@ -55,7 +55,11 @@ async function loginEmpleado() {
 function cambiarEmpleado() {
   if (!confirm('¿Cambiar de empleado?')) return;
   localStorage.removeItem('empleadoNombre');
+  diaData = null;
   document.getElementById('empleadoDisplay').style.display = 'none';
+  document.getElementById('productosLista').style.display = 'none';
+  document.getElementById('btnCerrarDia').style.display = 'none';
+  document.getElementById('bannerCerrado').style.display = 'none';
   document.getElementById('inputNombreEmpleado').value = '';
   mostrarLoginEmpleado();
 }
