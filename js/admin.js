@@ -181,6 +181,7 @@ async function renderInventario() {
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-sm btn-primario" onclick="abrirAjusteStock()">✏️ Ajuste de stock</button>
+            <button class="btn btn-sm btn-secundario" onclick="verSiguienteDia()">👁 Ver siguiente día</button>
             ${diaData?.estado === 'cerrado'
               ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${diaHoyId}')">Reabrir día</button>`
               : ''}
@@ -329,6 +330,62 @@ async function verDetalleDia(fecha) {
     console.error(err);
     cont.innerHTML = `<button class="btn btn-secundario btn-sm" onclick="cargarListaHistorial()" style="margin-bottom:14px;">← Historial</button>
       <div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar los datos.</p></div>`;
+  }
+}
+
+async function verSiguienteDia() {
+  mostrarSpinner();
+  try {
+    const snap = await db.collection('dias').doc(diaHoyId).get();
+    const diaData = snap.exists ? snap.data() : null;
+    const activos = productos.filter(p => p.activo);
+
+    // Calcular la fecha de mañana en zona El Salvador
+    const hoy = new Date(diaHoyId + 'T12:00:00');
+    hoy.setDate(hoy.getDate() + 1);
+    const manana = hoy.toISOString().slice(0, 10);
+
+    let filas = '';
+    let hayAlertas = false;
+
+    for (const p of activos) {
+      const item = diaData?.items?.[p.id] || { inicial: 0, entradas: 0, usado: 0 };
+      const restanteHoy = parseFloat(item.inicial || 0) + parseFloat(item.entradas || 0) - parseFloat(item.usado || 0);
+      const inicialManana = Math.max(0, restanteHoy);
+      const esBajo = p.stockMinimo > 0 && inicialManana < p.stockMinimo;
+      if (esBajo) hayAlertas = true;
+
+      filas += `
+        <tr>
+          <td>
+            <div style="font-weight:600;">${p.nombre}</div>
+            <div style="font-size:0.72rem;color:var(--texto-muted);">${p.unidad}</div>
+          </td>
+          <td style="font-weight:700;font-size:1.05rem;${restanteHoy < 0 ? 'color:var(--peligro);' : ''}">${formatNum(inicialManana)}</td>
+          <td>
+            ${esBajo
+              ? `<span class="badge-stock badge-${inicialManana <= p.stockMinimo * 0.5 ? 'critico' : 'bajo'}">⚠ ${inicialManana <= p.stockMinimo * 0.5 ? 'Crítico' : 'Bajo'}</span>`
+              : `<span style="color:var(--exito);">✓</span>`}
+          </td>
+        </tr>
+      `;
+    }
+
+    document.getElementById('siguienteDiaFecha').textContent = formatearFecha(manana);
+    document.getElementById('siguienteDiaFuente').textContent =
+      diaData?.estado === 'cerrado'
+        ? `Basado en el cierre de ${formatearFecha(diaHoyId)}`
+        : `⚠️ El día de hoy aún no está cerrado — estos valores pueden cambiar`;
+    document.getElementById('siguienteDiaFuenteColor').style.color =
+      diaData?.estado === 'cerrado' ? 'var(--exito)' : 'var(--alerta)';
+    document.getElementById('siguienteDiaAlerta').style.display = hayAlertas ? 'block' : 'none';
+    document.getElementById('siguienteDiaTabla').innerHTML = filas;
+    document.getElementById('modalSiguienteDia').style.display = 'flex';
+  } catch (err) {
+    console.error(err);
+    showToast('Error al calcular el siguiente día', 'error');
+  } finally {
+    ocultarSpinner();
   }
 }
 
