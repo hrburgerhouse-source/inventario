@@ -183,6 +183,19 @@ function buildFilasTurno(items, activos) {
 }
 
 async function renderInventario() {
+  // Insertar botón cerrar sesión en nav si no existe
+  if (!document.getElementById('btnLogoutNav')) {
+    const nav = document.querySelector('.nav-admin');
+    if (nav) {
+      const btn = document.createElement('button');
+      btn.id = 'btnLogoutNav';
+      btn.textContent = '🔒 Cerrar sesión';
+      btn.onclick = cerrarSesion;
+      btn.style.cssText = 'background:none;border:1px solid var(--borde);border-radius:8px;padding:6px 12px;font-size:0.78rem;color:var(--texto-muted);cursor:pointer;white-space:nowrap;margin-left:auto;';
+      nav.appendChild(btn);
+    }
+  }
+
   const container = document.getElementById('tab-inventario');
   container.innerHTML = `<div class="skeleton" style="height:240px;"></div>`;
 
