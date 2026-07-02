@@ -245,9 +245,12 @@ async function cargarListaHistorial() {
             <div class="dia-fecha">${formatearFecha(d.fecha)}</div>
             <div class="dia-sub">${qty} producto${qty !== 1 ? 's' : ''}${hora ? ' · cerrado ' + hora : ''}</div>
           </div>
-          <span class="chip ${d.estado === 'cerrado' ? 'chip-exito' : 'chip-alerta'}">
-            ${d.estado === 'cerrado' ? '✅ Cerrado' : '🟡 Abierto'}
-          </span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="chip ${d.estado === 'cerrado' ? 'chip-exito' : 'chip-alerta'}">
+              ${d.estado === 'cerrado' ? '✅ Cerrado' : '🟡 Abierto'}
+            </span>
+            <button class="btn btn-sm btn-peligro" onclick="event.stopPropagation(); eliminarDia('${d.fecha}')">🗑</button>
+          </div>
         </div>
       `;
     }).join('');
@@ -323,6 +326,21 @@ async function verDetalleDia(fecha) {
     console.error(err);
     cont.innerHTML = `<button class="btn btn-secundario btn-sm" onclick="cargarListaHistorial()" style="margin-bottom:14px;">← Historial</button>
       <div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar los datos.</p></div>`;
+  }
+}
+
+async function eliminarDia(fecha) {
+  if (!confirm(`¿Eliminar el registro del ${formatearFecha(fecha)}?\n\nEsta acción no se puede deshacer.`)) return;
+  mostrarSpinner();
+  try {
+    await db.collection('dias').doc(fecha).delete();
+    showToast(`Día ${fecha} eliminado`, 'exito');
+    cargarListaHistorial();
+  } catch (err) {
+    console.error(err);
+    showToast('Error al eliminar el día', 'error');
+  } finally {
+    ocultarSpinner();
   }
 }
 
