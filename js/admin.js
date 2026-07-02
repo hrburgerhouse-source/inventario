@@ -179,9 +179,12 @@ async function renderInventario() {
               ${alertas > 0 ? `· <span style="color:var(--alerta);">⚠ ${alertas} alerta${alertas > 1 ? 's' : ''}</span>` : ''}
             </div>
           </div>
-          ${diaData?.estado === 'cerrado'
-            ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${diaHoyId}')">Reabrir día</button>`
-            : ''}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-primario" onclick="abrirAjusteStock()">✏️ Ajuste de stock</button>
+            ${diaData?.estado === 'cerrado'
+              ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${diaHoyId}')">Reabrir día</button>`
+              : ''}
+          </div>
         </div>
       </div>
 
@@ -326,6 +329,99 @@ async function verDetalleDia(fecha) {
     console.error(err);
     cont.innerHTML = `<button class="btn btn-secundario btn-sm" onclick="cargarListaHistorial()" style="margin-bottom:14px;">← Historial</button>
       <div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar los datos.</p></div>`;
+  }
+}
+
+async function abrirAjusteStock() {
+  mostrarSpinner();
+  try {
+    const snap = await db.collection('dias').doc(diaHoyId).get();
+    const diaData = snap.exists ? snap.data() : null;
+    const activos = productos.filter(p => p.activo);
+
+    if (activos.length === 0) {
+      showToast('No hay productos activos en el catálogo', 'error');
+      return;
+    }
+
+    const filas = activos.map(p => {
+      const item = diaData?.items?.[p.id] || { inicial: 0 };
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--borde);">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:0.9rem;">${p.nombre}</div>
+            <div style="font-size:0.72rem;color:var(--texto-muted);">${p.unidad}</div>
+          </div>
+          <input
+            type="number"
+            id="ajuste-${p.id}"
+            value="${parseFloat(item.inicial) || 0}"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            style="width:90px;padding:8px;border:2px solid var(--borde);border-radius:8px;font-size:1rem;font-weight:700;text-align:center;background:var(--bg);color:var(--texto);font-family:inherit;"
+          >
+        </div>
+      `;
+    }).join('');
+
+    document.getElementById('ajusteStockLista').innerHTML = filas;
+    document.getElementById('modalAjusteStock').style.display = 'flex';
+  } catch (err) {
+    console.error(err);
+    showToast('Error al cargar los datos', 'error');
+  } finally {
+    ocultarSpinner();
+  }
+}
+
+function cerrarAjusteStock() {
+  document.getElementById('modalAjusteStock').style.display = 'none';
+}
+
+async function guardarAjusteStock() {
+  cerrarAjusteStock();
+  mostrarSpinner();
+
+  try {
+    const snap = await db.collection('dias').doc(diaHoyId).get();
+    const activos = productos.filter(p => p.activo);
+
+    if (!snap.exists) {
+      // Crear el documento del día desde cero
+      const items = {};
+      activos.forEach(p => {
+        const val = parseFloat(document.getElementById(`ajuste-${p.id}`)?.value) || 0;
+        items[p.id] = { inicial: val, entradas: 0, usado: 0, restante: val };
+      });
+      await db.collection('dias').doc(diaHoyId).set({
+        fecha: diaHoyId,
+        estado: 'abierto',
+        creadoAt: firebase.firestore.FieldValue.serverTimestamp(),
+        cerradoAt: null,
+        cerradoPor: null,
+        items
+      });
+    } else {
+      const diaData = snap.data();
+      const updates = {};
+      activos.forEach(p => {
+        const nuevoInicial = parseFloat(document.getElementById(`ajuste-${p.id}`)?.value) || 0;
+        const item = diaData.items?.[p.id] || { entradas: 0, usado: 0 };
+        const nuevoRestante = nuevoInicial + parseFloat(item.entradas || 0) - parseFloat(item.usado || 0);
+        updates[`items.${p.id}.inicial`] = nuevoInicial;
+        updates[`items.${p.id}.restante`] = nuevoRestante;
+      });
+      await db.collection('dias').doc(diaHoyId).update(updates);
+    }
+
+    showToast('Ajuste de stock guardado correctamente', 'exito');
+    renderInventario();
+  } catch (err) {
+    console.error(err);
+    showToast('Error al guardar el ajuste', 'error');
+  } finally {
+    ocultarSpinner();
   }
 }
 

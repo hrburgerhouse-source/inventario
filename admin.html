@@ -162,6 +162,21 @@
     </div>
   </div>
 
+  <!-- Modal: Ajuste de stock inicial -->
+  <div id="modalAjusteStock" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal" style="max-width:420px; max-height:88vh; overflow-y:auto;">
+      <h3>Ajuste de stock inicial</h3>
+      <p style="font-size:0.8rem;color:var(--texto-muted);margin-bottom:14px;">
+        Escribe la cantidad real disponible de cada producto. El restante se recalculará automáticamente.
+      </p>
+      <div id="ajusteStockLista"></div>
+      <div class="modal-acciones" style="position:sticky;bottom:0;background:var(--bg-card);padding-top:12px;">
+        <button class="btn btn-secundario" onclick="cerrarAjusteStock()">Cancelar</button>
+        <button class="btn btn-primario" onclick="guardarAjusteStock()">Guardar ajuste</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Cambiar PIN -->
   <div id="modalCambiarPin" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
     <div class="modal">
