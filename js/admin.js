@@ -103,16 +103,13 @@ function errorPin() {
 // ── Panel Admin ────────────────────────────────────────────────────────────
 
 function renderNav() {
-  const nav = document.querySelector('.nav-admin');
-  if (!nav) return;
-  nav.innerHTML = `
-    <div style="display:flex;gap:2px;flex-wrap:wrap;">
-      <button class="tab-btn" data-tab="inventario" onclick="cambiarTab('inventario')">Inventario</button>
-      <button class="tab-btn" data-tab="historial" onclick="cambiarTab('historial')">Historial</button>
-      <button class="tab-btn" data-tab="catalogo" onclick="cambiarTab('catalogo')">Catálogo</button>
-      ${rolAdmin !== 'encargado' ? `<button class="tab-btn" data-tab="ajustes" onclick="cambiarTab('ajustes')">Ajustes</button>` : ''}
-    </div>
-    <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--borde);border-radius:8px;padding:6px 12px;font-size:0.78rem;color:var(--texto-muted);cursor:pointer;white-space:nowrap;">🔒 Cerrar sesión</button>
+  const tabs = document.querySelector('.nav-admin .nav-tabs');
+  if (!tabs) return;
+  tabs.innerHTML = `
+    <button class="tab-btn" data-tab="inventario" onclick="cambiarTab('inventario')">Inventario</button>
+    <button class="tab-btn" data-tab="historial" onclick="cambiarTab('historial')">Historial</button>
+    <button class="tab-btn" data-tab="catalogo" onclick="cambiarTab('catalogo')">Catálogo</button>
+    ${rolAdmin !== 'encargado' ? `<button class="tab-btn" data-tab="ajustes" onclick="cambiarTab('ajustes')">Ajustes</button>` : ''}
   `;
 }
 
