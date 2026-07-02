@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FF6B35">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="HR Inventario">
+  <link rel="apple-touch-icon" href="logo.jpeg">
+  <link rel="manifest" href="manifest.json">
+  <title>HR Burger House — Inventario</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <img src="logo.jpeg" alt="HR Burger House">
+    <div class="header-info">
+      <h1>HR Burger House</h1>
+      <div class="subtitulo" id="fechaDisplay">Cargando…</div>
+    </div>
+    <button id="themeToggle" title="Cambiar tema">🌙</button>
+  </header>
+
+  <!-- ── Banner día cerrado (oculto por defecto) ── -->
+  <div id="bannerCerrado" style="padding:14px 14px 0; display:none;">
+    <div class="banner-cerrado">
+      <div class="icono">✅</div>
+      <h3>Día cerrado</h3>
+      <p id="cierreHora"></p>
+    </div>
+  </div>
+
+  <!-- ── Contenido principal ── -->
+  <main style="padding:14px;">
+
+    <!-- Skeleton de carga -->
+    <div id="loadingState">
+      <div class="skeleton" style="height:100px; margin-bottom:12px;"></div>
+      <div class="skeleton" style="height:100px; margin-bottom:12px;"></div>
+      <div class="skeleton" style="height:100px;"></div>
+    </div>
+
+    <!-- Lista de productos (se llena por JS) -->
+    <div id="productosLista" style="display:none;"></div>
+
+    <!-- Estado vacío -->
+    <div id="emptyState" class="empty-state" style="display:none;">
+      <div class="icon">📦</div>
+      <p>No hay productos activos.<br>Pide al administrador que configure el catálogo.</p>
+      <br>
+      <a href="admin.html" class="btn btn-secundario btn-sm">Ir al panel admin</a>
+    </div>
+
+    <!-- Botón cerrar día -->
+    <button id="btnCerrarDia" class="btn-cerrar-dia" style="display:none;">
+      ✓ Cerrar día
+    </button>
+
+  </main>
+
+  <!-- ── Modal: Entrada de inventario ── -->
+  <div id="modalEntrada" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3>+ Entrada de inventario</h3>
+      <p id="modalEntradaNombre" style="font-size:0.85rem;color:var(--texto-muted);margin-bottom:14px;"></p>
+      <div class="form-grupo">
+        <label class="form-label" for="entradaCantidad">Cantidad a agregar</label>
+        <input
+          type="number"
+          id="entradaCantidad"
+          class="form-input form-input-grande"
+          placeholder="0"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+        >
+      </div>
+      <div class="modal-acciones">
+        <button class="btn btn-secundario" id="btnCancelarEntrada">Cancelar</button>
+        <button class="btn btn-primario" id="btnGuardarEntrada">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Spinner ── -->
+  <div id="spinnerOverlay" class="spinner-overlay" style="display:none;">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ── Toasts ── -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- ── Link admin ── -->
+  <div style="text-align:center;padding:8px 0 20px;font-size:0.78rem;">
+    <a href="admin.html" style="color:var(--texto-muted);text-decoration:none;">Panel administrador →</a>
+  </div>
+
+  <!-- ── Firebase SDK (CDN compat v9.23.0) ── -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- ── App ── -->
+  <script src="js/config.js"></script>
+  <script src="js/theme.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
