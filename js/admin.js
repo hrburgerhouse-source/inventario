@@ -102,32 +102,30 @@ function errorPin() {
 
 // ── Panel Admin ────────────────────────────────────────────────────────────
 
+function renderNav() {
+  const nav = document.querySelector('.nav-admin');
+  if (!nav) return;
+  nav.innerHTML = `
+    <div style="display:flex;gap:2px;flex-wrap:wrap;">
+      <button class="tab-btn" data-tab="inventario" onclick="cambiarTab('inventario')">Inventario</button>
+      <button class="tab-btn" data-tab="historial" onclick="cambiarTab('historial')">Historial</button>
+      <button class="tab-btn" data-tab="catalogo" onclick="cambiarTab('catalogo')">Catálogo</button>
+      ${rolAdmin !== 'encargado' ? `<button class="tab-btn" data-tab="ajustes" onclick="cambiarTab('ajustes')">Ajustes</button>` : ''}
+    </div>
+    <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--borde);border-radius:8px;padding:6px 12px;font-size:0.78rem;color:var(--texto-muted);cursor:pointer;white-space:nowrap;">🔒 Cerrar sesión</button>
+  `;
+}
+
 async function mostrarPanelAdmin() {
   document.getElementById('pinScreen').style.display = 'none';
   document.getElementById('adminPanel').style.display = 'block';
   diaHoyId = getFechaHoy();
   rolAdmin = sessionStorage.getItem('adminRol') || 'admin';
 
-  // Ajustar UI según el rol
   const subtitulo = document.querySelector('.header .subtitulo');
   if (subtitulo) subtitulo.textContent = rolAdmin === 'encargado' ? 'Panel Encargado' : 'Panel de Administración';
 
-  const tabAjustesBtn = document.querySelector('.nav-admin [data-tab="ajustes"]');
-  if (tabAjustesBtn) tabAjustesBtn.style.display = rolAdmin === 'encargado' ? 'none' : '';
-
-  // Insertar botón cerrar sesión en nav (funciona con cualquier versión del HTML)
-  if (!document.getElementById('btnLogoutNav')) {
-    const nav = document.querySelector('.nav-admin');
-    if (nav) {
-      const btn = document.createElement('button');
-      btn.id = 'btnLogoutNav';
-      btn.textContent = '🔒 Cerrar sesión';
-      btn.onclick = cerrarSesion;
-      btn.style.cssText = 'background:none;border:1px solid var(--borde);border-radius:8px;padding:6px 12px;font-size:0.78rem;color:var(--texto-muted);cursor:pointer;white-space:nowrap;margin-left:auto;';
-      nav.appendChild(btn);
-    }
-  }
-
+  renderNav();
   await cargarProductos();
   cambiarTab('inventario');
 }
