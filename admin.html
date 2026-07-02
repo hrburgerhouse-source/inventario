@@ -14,6 +14,27 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    // Limpia cachés viejas del service worker y recarga automáticamente
+    if ('caches' in window) {
+      caches.keys().then(function(keys) {
+        var viejas = keys.filter(function(k) { return k !== 'hr-inventario-v4'; });
+        if (viejas.length > 0) {
+          Promise.all(viejas.map(function(k) { return caches.delete(k); })).then(function() {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                Promise.all(regs.map(function(r) { return r.unregister(); })).then(function() {
+                  window.location.reload(true);
+                });
+              });
+            } else {
+              window.location.reload(true);
+            }
+          });
+        }
+      });
+    }
+  </script>
 </head>
 <body>
 
