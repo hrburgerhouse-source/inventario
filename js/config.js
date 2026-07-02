@@ -1,15 +1,12 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURACIÓN DE FIREBASE
-// Copia estos valores desde la Consola de Firebase:
-//   → Configuración del proyecto (ícono ⚙️) → Tus apps → Configuración del SDK
-// ─────────────────────────────────────────────────────────────────────────────
+// Firebase project: inventario-a814d
+// Para actualizar: Firebase Console → Configuración del proyecto → Tus apps → Config
 const firebaseConfig = {
-  apiKey:            "TU_API_KEY",
-  authDomain:        "TU_PROJECT_ID.firebaseapp.com",
-  projectId:         "TU_PROJECT_ID",
-  storageBucket:     "TU_PROJECT_ID.appspot.com",
-  messagingSenderId: "TU_MESSAGING_SENDER_ID",
-  appId:             "TU_APP_ID"
+  apiKey: "AIzaSyDqK7onevckU4llJMHStPmU2ErRU-hF8Q4",
+  authDomain: "inventario-a814d.firebaseapp.com",
+  projectId: "inventario-a814d",
+  storageBucket: "inventario-a814d.firebasestorage.app",
+  messagingSenderId: "750525909917",
+  appId: "1:750525909917:web:93601df59feb8fd20d7d74"
 };
 
 firebase.initializeApp(firebaseConfig);
