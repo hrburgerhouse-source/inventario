@@ -1,7 +1,5 @@
-const CACHE = 'hr-inventario-v3';
+const CACHE = 'hr-inventario-v4';
 const ASSETS = [
-  './index.html',
-  './admin.html',
   './css/style.css',
   './js/config.js',
   './js/theme.js',
@@ -26,10 +24,15 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // No interceptar Firebase ni Google APIs
   if (e.request.url.includes('googleapis.com') ||
       e.request.url.includes('gstatic.com') ||
       e.request.url.includes('firestore')) return;
+
+  // HTML siempre desde la red para que nunca quede desactualizado
+  if (e.request.destination === 'document') {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
 
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
