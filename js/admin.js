@@ -115,6 +115,19 @@ async function mostrarPanelAdmin() {
   const tabAjustesBtn = document.querySelector('.nav-admin [data-tab="ajustes"]');
   if (tabAjustesBtn) tabAjustesBtn.style.display = rolAdmin === 'encargado' ? 'none' : '';
 
+  // Insertar botón cerrar sesión en nav (funciona con cualquier versión del HTML)
+  if (!document.getElementById('btnLogoutNav')) {
+    const nav = document.querySelector('.nav-admin');
+    if (nav) {
+      const btn = document.createElement('button');
+      btn.id = 'btnLogoutNav';
+      btn.textContent = '🔒 Cerrar sesión';
+      btn.onclick = cerrarSesion;
+      btn.style.cssText = 'background:none;border:1px solid var(--borde);border-radius:8px;padding:6px 12px;font-size:0.78rem;color:var(--texto-muted);cursor:pointer;white-space:nowrap;margin-left:auto;';
+      nav.appendChild(btn);
+    }
+  }
+
   await cargarProductos();
   cambiarTab('inventario');
 }
