@@ -91,16 +91,8 @@
   ═══════════════════════════════════════════════════════════════════════════ -->
   <div id="adminPanel" style="display:none;">
 
-    <!-- Nav tabs -->
-    <nav class="nav-admin" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px;">
-      <div style="display:flex;gap:2px;flex-wrap:wrap;">
-        <button class="tab-btn" data-tab="inventario" onclick="cambiarTab('inventario')">Inventario</button>
-        <button class="tab-btn" data-tab="historial" onclick="cambiarTab('historial')">Historial</button>
-        <button class="tab-btn" data-tab="catalogo" onclick="cambiarTab('catalogo')">Catálogo</button>
-        <button class="tab-btn" data-tab="ajustes" onclick="cambiarTab('ajustes')">Ajustes</button>
-      </div>
-      <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--borde);border-radius:8px;padding:6px 12px;font-size:0.78rem;color:var(--texto-muted);cursor:pointer;white-space:nowrap;">🔒 Cerrar sesión</button>
-    </nav>
+    <!-- Nav tabs (contenido renderizado por JS en renderNav()) -->
+    <nav class="nav-admin"></nav>
 
     <!-- Tab: Inventario actual -->
     <div id="tab-inventario" class="admin-tab"></div>
@@ -272,7 +264,7 @@
   <!-- ── App ── -->
   <script src="js/config.js?v=20260702"></script>
   <script src="js/theme.js?v=20260702"></script>
-  <script src="js/admin.js?v=20260702"></script>
+  <script src="js/admin.js?v=20260703"></script>
 
 </body>
 </html>
