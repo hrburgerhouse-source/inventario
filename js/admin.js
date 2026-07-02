@@ -126,79 +126,86 @@ async function cargarProductos() {
 
 // ── TAB: Inventario actual ─────────────────────────────────────────────────
 
+function buildFilasTurno(items, activos) {
+  let filas = '';
+  let alertas = 0;
+  for (const p of activos) {
+    const item = items?.[p.id] || { inicial: 0, entradas: 0, usado: 0 };
+    const restante = parseFloat(item.inicial) + parseFloat(item.entradas) - parseFloat(item.usado);
+    const esBajo = p.stockMinimo > 0 && restante < p.stockMinimo && restante >= p.stockMinimo * 0.5;
+    const esCritico = p.stockMinimo > 0 && restante < p.stockMinimo * 0.5;
+    if (esBajo || esCritico) alertas++;
+    filas += `
+      <tr>
+        <td>
+          <div style="font-weight:600;">${p.nombre}</div>
+          <div style="font-size:0.72rem;color:var(--texto-muted);">${p.categoria} · ${p.unidad}</div>
+        </td>
+        <td>${formatNum(item.inicial)}</td>
+        <td style="color:var(--exito)">${parseFloat(item.entradas) > 0 ? '+' + formatNum(item.entradas) : '—'}</td>
+        <td>${formatNum(item.usado)}</td>
+        <td style="${restante < 0 ? 'color:var(--peligro);font-weight:700;' : ''}">${formatNum(restante)}</td>
+        <td>${esCritico ? `<span class="badge-stock badge-critico">⚠ Crítico</span>` : esBajo ? `<span class="badge-stock badge-bajo">↓ Bajo</span>` : `<span style="color:var(--exito);">✓</span>`}</td>
+      </tr>`;
+  }
+  return { filas, alertas };
+}
+
 async function renderInventario() {
   const container = document.getElementById('tab-inventario');
   container.innerHTML = `<div class="skeleton" style="height:240px;"></div>`;
 
   try {
     const snap = await db.collection('dias').doc(diaHoyId).get();
-    const diaData = snap.exists ? snap.data() : null;
+    const doc = snap.exists ? snap.data() : null;
     const activos = productos.filter(p => p.activo);
-    const estado = diaData
-      ? (diaData.estado === 'cerrado' ? '✅ Cerrado' : '🟡 Abierto')
-      : 'Sin datos';
 
-    let alertas = 0;
+    const t2 = doc?.turno2 || null;
+    const estadoTexto = !doc ? 'Sin datos'
+      : t2?.estado === 'cerrado' ? '✅ Jornada completa'
+      : t2 ? `🟡 Turno 2 abierto (${t2.cerradoPor || ''})`
+      : doc.estado === 'cerrado' ? '✅ Turno 1 cerrado'
+      : '🟡 Turno 1 abierto';
 
-    let filas = '';
-    for (const p of activos) {
-      const item = diaData?.items?.[p.id] || { inicial: 0, entradas: 0, usado: 0, restante: 0 };
-      const restante = parseFloat(item.inicial) + parseFloat(item.entradas) - parseFloat(item.usado);
-      const esBajo = p.stockMinimo > 0 && restante < p.stockMinimo && restante >= p.stockMinimo * 0.5;
-      const esCritico = p.stockMinimo > 0 && restante < p.stockMinimo * 0.5;
-      if (esBajo || esCritico) alertas++;
+    const puedeReabrir = doc && (t2?.estado === 'cerrado' || (!t2 && doc.estado === 'cerrado'));
+    const turnoActivoEs2 = t2 && t2.estado !== 'cerrado';
+    const turnoActivoEs1 = !t2 && doc?.estado !== 'cerrado';
 
-      filas += `
-        <tr>
-          <td>
-            <div style="font-weight:600;">${p.nombre}</div>
-            <div style="font-size:0.72rem;color:var(--texto-muted);">${p.categoria} · ${p.unidad}</div>
-          </td>
-          <td>${formatNum(item.inicial)}</td>
-          <td style="color:var(--exito)">${parseFloat(item.entradas) > 0 ? '+' + formatNum(item.entradas) : '—'}</td>
-          <td>${formatNum(item.usado)}</td>
-          <td style="${restante < 0 ? 'color:var(--peligro);font-weight:700;' : ''}">${formatNum(restante)}</td>
-          <td>
-            ${esCritico
-              ? `<span class="badge-stock badge-critico">⚠ Crítico</span>`
-              : esBajo
-              ? `<span class="badge-stock badge-bajo">↓ Bajo</span>`
-              : `<span style="color:var(--exito);">✓</span>`
-            }
-          </td>
-        </tr>
-      `;
-    }
+    const { filas: filas1, alertas: alertas1 } = buildFilasTurno(doc?.items, activos);
+    const { filas: filas2, alertas: alertas2 } = t2 ? buildFilasTurno(t2.items, activos) : { filas: '', alertas: 0 };
+    const alertasTotal = alertas1 + alertas2;
+
+    const tablaTurno = (titulo, filas, estado, cerradoPor) => `
+      <div style="font-size:0.8rem;font-weight:700;color:var(--texto-muted);margin:14px 0 6px;">${titulo}
+        <span style="font-weight:400;margin-left:6px;">${estado === 'cerrado' ? `✅ Cerrado${cerradoPor ? ' por ' + cerradoPor : ''}` : '🟡 Abierto'}</span>
+      </div>
+      <div class="tabla-wrapper">
+        <table class="tabla">
+          <thead><tr><th>Producto</th><th>Inicial</th><th>Entradas</th><th>Usado</th><th>Restante</th><th>Stock</th></tr></thead>
+          <tbody>${filas || '<tr><td colspan="6" style="text-align:center;color:var(--texto-muted);">Sin datos</td></tr>'}</tbody>
+        </table>
+      </div>`;
 
     container.innerHTML = `
       <div class="card" style="margin-bottom:14px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div>
             <div style="font-weight:700;">${formatearFecha(diaHoyId)}</div>
-            <div style="font-size:0.8rem;color:var(--texto-muted);">Estado: ${estado}
-              ${alertas > 0 ? `· <span style="color:var(--alerta);">⚠ ${alertas} alerta${alertas > 1 ? 's' : ''}</span>` : ''}
+            <div style="font-size:0.8rem;color:var(--texto-muted);">${estadoTexto}
+              ${alertasTotal > 0 ? `· <span style="color:var(--alerta);">⚠ ${alertasTotal} alerta${alertasTotal > 1 ? 's' : ''}</span>` : ''}
             </div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-sm btn-primario" onclick="abrirAjusteStock()">✏️ Ajuste de stock</button>
+            ${(turnoActivoEs1 || turnoActivoEs2) ? `<button class="btn btn-sm btn-primario" onclick="abrirAjusteStock()">✏️ Ajuste de stock</button>` : ''}
             <button class="btn btn-sm btn-secundario" onclick="verSiguienteDia()">👁 Ver siguiente día</button>
-            ${diaData?.estado === 'cerrado'
-              ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${diaHoyId}')">Reabrir día</button>`
-              : ''}
+            ${puedeReabrir ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${diaHoyId}')">Reabrir</button>` : ''}
           </div>
         </div>
       </div>
-
       ${activos.length === 0
-        ? `<div class="empty-state"><div class="icon">📦</div><p>No hay productos activos.<br>Configura el catálogo primero.</p></div>`
-        : `<div class="tabla-wrapper">
-             <table class="tabla">
-               <thead><tr>
-                 <th>Producto</th><th>Inicial</th><th>Entradas</th><th>Usado</th><th>Restante</th><th>Estado</th>
-               </tr></thead>
-               <tbody>${filas}</tbody>
-             </table>
-           </div>`
+        ? `<div class="empty-state"><div class="icon">📦</div><p>No hay productos activos.</p></div>`
+        : tablaTurno('Turno 1', filas1, doc?.estado || 'abierto', doc?.cerradoPor)
+          + (t2 ? tablaTurno('Turno 2', filas2, t2.estado, t2.cerradoPor) : '')
       }
     `;
   } catch (err) {
@@ -284,23 +291,26 @@ async function verDetalleDia(fecha) {
     const prodMap = {};
     productos.forEach(p => { prodMap[p.id] = p; });
 
-    let filas = '';
-    for (const [id, item] of Object.entries(d.items || {})) {
-      const p = prodMap[id];
-      const restante = parseFloat(item.inicial) + parseFloat(item.entradas) - parseFloat(item.usado);
-      filas += `
-        <tr>
-          <td>
-            <div style="font-weight:600;">${p?.nombre || id}</div>
-            ${p ? `<div style="font-size:0.72rem;color:var(--texto-muted);">${p.unidad}</div>` : ''}
-          </td>
+    const buildTabla = (items) => {
+      let filas = '';
+      for (const [id, item] of Object.entries(items || {})) {
+        const p = prodMap[id];
+        const restante = parseFloat(item.inicial) + parseFloat(item.entradas) - parseFloat(item.usado);
+        filas += `<tr>
+          <td><div style="font-weight:600;">${p?.nombre || id}</div>${p ? `<div style="font-size:0.72rem;color:var(--texto-muted);">${p.unidad}</div>` : ''}</td>
           <td>${formatNum(item.inicial)}</td>
           <td style="color:var(--exito)">${parseFloat(item.entradas) > 0 ? '+' + formatNum(item.entradas) : '—'}</td>
           <td>${formatNum(item.usado)}</td>
           <td style="${restante < 0 ? 'color:var(--peligro);font-weight:700;' : ''}">${formatNum(restante)}</td>
-        </tr>
-      `;
-    }
+        </tr>`;
+      }
+      return `<div class="tabla-wrapper"><table class="tabla">
+        <thead><tr><th>Producto</th><th>Inicial</th><th>Entradas</th><th>Usado</th><th>Restante</th></tr></thead>
+        <tbody>${filas || '<tr><td colspan="5" style="text-align:center;color:var(--texto-muted);">Sin items</td></tr>'}</tbody>
+      </table></div>`;
+    };
+
+    const puedeReabrir = d.turno2?.estado === 'cerrado' || (!d.turno2 && d.estado === 'cerrado');
 
     cont.innerHTML = `
       ${volver}
@@ -309,22 +319,22 @@ async function verDetalleDia(fecha) {
           <div>
             <div style="font-weight:700;font-size:1rem;">${formatearFecha(d.fecha)}</div>
             <div style="font-size:0.8rem;color:var(--texto-muted);">
-              Estado: ${d.estado === 'cerrado' ? '✅ Cerrado' : '🟡 Abierto'}
+              ${d.turno2?.estado === 'cerrado' ? '✅ Jornada completa' : d.estado === 'cerrado' ? '✅ Turno 1 cerrado' : '🟡 Abierto'}
             </div>
           </div>
-          ${d.estado === 'cerrado'
-            ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${fecha}')">Reabrir</button>`
-            : ''}
+          ${puedeReabrir ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${fecha}')">Reabrir</button>` : ''}
         </div>
       </div>
-      <div class="tabla-wrapper">
-        <table class="tabla">
-          <thead><tr>
-            <th>Producto</th><th>Inicial</th><th>Entradas</th><th>Usado</th><th>Restante</th>
-          </tr></thead>
-          <tbody>${filas || '<tr><td colspan="5" style="text-align:center;color:var(--texto-muted);">Sin items</td></tr>'}</tbody>
-        </table>
+      <div style="font-size:0.8rem;font-weight:700;color:var(--texto-muted);margin-bottom:6px;">
+        Turno 1 <span style="font-weight:400;">${d.estado === 'cerrado' ? `✅ Cerrado${d.cerradoPor ? ' por ' + d.cerradoPor : ''}` : '🟡 Abierto'}</span>
       </div>
+      ${buildTabla(d.items)}
+      ${d.turno2 ? `
+        <div style="font-size:0.8rem;font-weight:700;color:var(--texto-muted);margin:14px 0 6px;">
+          Turno 2 <span style="font-weight:400;">${d.turno2.estado === 'cerrado' ? `✅ Cerrado${d.turno2.cerradoPor ? ' por ' + d.turno2.cerradoPor : ''}` : '🟡 Abierto'}</span>
+        </div>
+        ${buildTabla(d.turno2.items)}
+      ` : ''}
     `;
   } catch (err) {
     console.error(err);
@@ -339,6 +349,9 @@ async function verSiguienteDia() {
     const snap = await db.collection('dias').doc(diaHoyId).get();
     const diaData = snap.exists ? snap.data() : null;
     const activos = productos.filter(p => p.activo);
+    const lastItems = diaData?.turno2?.items || diaData?.items || {};
+    const jornadadCompleta = diaData?.turno2?.estado === 'cerrado';
+    const t1Cerrado = diaData?.estado === 'cerrado';
 
     // Calcular la fecha de mañana en zona El Salvador
     const hoy = new Date(diaHoyId + 'T12:00:00');
@@ -349,7 +362,7 @@ async function verSiguienteDia() {
     let hayAlertas = false;
 
     for (const p of activos) {
-      const item = diaData?.items?.[p.id] || { inicial: 0, entradas: 0, usado: 0 };
+      const item = lastItems[p.id] || { inicial: 0, entradas: 0, usado: 0 };
       const restanteHoy = parseFloat(item.inicial || 0) + parseFloat(item.entradas || 0) - parseFloat(item.usado || 0);
       const inicialManana = Math.max(0, restanteHoy);
       const esBajo = p.stockMinimo > 0 && inicialManana < p.stockMinimo;
@@ -373,11 +386,11 @@ async function verSiguienteDia() {
 
     document.getElementById('siguienteDiaFecha').textContent = formatearFecha(manana);
     document.getElementById('siguienteDiaFuente').textContent =
-      diaData?.estado === 'cerrado'
-        ? `Basado en el cierre de ${formatearFecha(diaHoyId)}`
-        : `⚠️ El día de hoy aún no está cerrado — estos valores pueden cambiar`;
+      jornadadCompleta ? `Basado en el cierre del turno 2`
+      : t1Cerrado ? `Basado en el cierre del turno 1 (turno 2 aún pendiente)`
+      : `⚠️ Ningún turno cerrado aún — valores pueden cambiar`;
     document.getElementById('siguienteDiaFuenteColor').style.color =
-      diaData?.estado === 'cerrado' ? 'var(--exito)' : 'var(--alerta)';
+      jornadadCompleta ? 'var(--exito)' : t1Cerrado ? 'var(--alerta)' : 'var(--peligro)';
     document.getElementById('siguienteDiaAlerta').style.display = hayAlertas ? 'block' : 'none';
     document.getElementById('siguienteDiaTabla').innerHTML = filas;
     document.getElementById('modalSiguienteDia').style.display = 'flex';
@@ -393,7 +406,7 @@ async function abrirAjusteStock() {
   mostrarSpinner();
   try {
     const snap = await db.collection('dias').doc(diaHoyId).get();
-    const diaData = snap.exists ? snap.data() : null;
+    const doc = snap.exists ? snap.data() : null;
     const activos = productos.filter(p => p.activo);
 
     if (activos.length === 0) {
@@ -401,9 +414,12 @@ async function abrirAjusteStock() {
       return;
     }
 
+    // Ajustar el turno activo (turno2 si está abierto, sino turno1)
+    const enTurno2 = doc?.turno2 && doc.turno2.estado !== 'cerrado';
+    const activeItems = enTurno2 ? doc.turno2.items : doc?.items;
+
     const filas = activos.map(p => {
-      const item = diaData?.items?.[p.id] || { inicial: 0, entradas: 0, usado: 0 };
-      // Mostrar el stock disponible actual (lo que hay ahora)
+      const item = activeItems?.[p.id] || { inicial: 0, entradas: 0, usado: 0 };
       const disponible = parseFloat(item.inicial || 0) + parseFloat(item.entradas || 0) - parseFloat(item.usado || 0);
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--borde);">
@@ -411,15 +427,8 @@ async function abrirAjusteStock() {
             <div style="font-weight:600;font-size:0.9rem;">${p.nombre}</div>
             <div style="font-size:0.72rem;color:var(--texto-muted);">${p.unidad}</div>
           </div>
-          <input
-            type="number"
-            id="ajuste-${p.id}"
-            value="${Math.max(0, disponible)}"
-            min="0"
-            step="0.01"
-            inputmode="decimal"
-            style="width:90px;padding:8px;border:2px solid var(--borde);border-radius:8px;font-size:1rem;font-weight:700;text-align:center;background:var(--bg);color:var(--texto);font-family:inherit;"
-          >
+          <input type="number" id="ajuste-${p.id}" value="${Math.max(0, disponible)}" min="0" step="0.01" inputmode="decimal"
+            style="width:90px;padding:8px;border:2px solid var(--borde);border-radius:8px;font-size:1rem;font-weight:700;text-align:center;background:var(--bg);color:var(--texto);font-family:inherit;">
         </div>
       `;
     }).join('');
@@ -463,17 +472,18 @@ async function guardarAjusteStock() {
         items
       });
     } else {
-      const diaData = snap.data();
+      const doc = snap.data();
+      const enTurno2 = doc?.turno2 && doc.turno2.estado !== 'cerrado';
+      const prefix = enTurno2 ? 'turno2.items' : 'items';
+      const activeItems = enTurno2 ? doc.turno2.items : doc.items;
       const updates = {};
       activos.forEach(p => {
         const nuevoStock = parseFloat(document.getElementById(`ajuste-${p.id}`)?.value) || 0;
-        const item = diaData.items?.[p.id] || { usado: 0 };
+        const item = activeItems?.[p.id] || { usado: 0 };
         const usado = parseFloat(item.usado || 0);
-        // El ajuste reemplaza el stock total: inicial = nuevoStock, entradas = 0
-        // Así restante = inicial - usado (sin que las entradas anteriores interfieran)
-        updates[`items.${p.id}.inicial`] = nuevoStock;
-        updates[`items.${p.id}.entradas`] = 0;
-        updates[`items.${p.id}.restante`] = nuevoStock - usado;
+        updates[`${prefix}.${p.id}.inicial`] = nuevoStock;
+        updates[`${prefix}.${p.id}.entradas`] = 0;
+        updates[`${prefix}.${p.id}.restante`] = nuevoStock - usado;
       });
       await db.collection('dias').doc(diaHoyId).update(updates);
     }
@@ -507,11 +517,17 @@ async function reabrirDia(fecha) {
   if (!confirm(`¿Reabrir el día ${formatearFecha(fecha)}?\nEl empleado podrá modificar los datos.`)) return;
   mostrarSpinner();
   try {
-    await db.collection('dias').doc(fecha).update({
-      estado: 'abierto',
-      cerradoAt: null,
-      cerradoPor: null
-    });
+    const snap = await db.collection('dias').doc(fecha).get();
+    const doc = snap.exists ? snap.data() : null;
+
+    let updates;
+    if (doc?.turno2?.estado === 'cerrado') {
+      updates = { 'turno2.estado': 'abierto', 'turno2.cerradoAt': null, 'turno2.cerradoPor': null };
+    } else {
+      updates = { estado: 'abierto', cerradoAt: null, cerradoPor: null };
+    }
+
+    await db.collection('dias').doc(fecha).update(updates);
     showToast('Día reabierto correctamente', 'exito');
     if (fecha === diaHoyId) renderInventario();
     else cargarListaHistorial();
@@ -532,26 +548,32 @@ async function exportarCSV() {
     const prodMap = {};
     productos.forEach(p => { prodMap[p.id] = p; });
 
-    const filas = [['Fecha', 'Dia', 'Estado', 'Producto', 'Categoria', 'Unidad', 'Inicial', 'Entradas', 'Usado', 'Restante']];
+    const filas = [['Fecha', 'Dia', 'Turno', 'Estado', 'Cerrado por', 'Producto', 'Categoria', 'Unidad', 'Inicial', 'Entradas', 'Usado', 'Restante']];
 
     snap.docs.forEach(doc => {
       const d = doc.data();
-      for (const [id, item] of Object.entries(d.items || {})) {
-        const p = prodMap[id];
-        const restante = parseFloat(item.inicial) + parseFloat(item.entradas) - parseFloat(item.usado);
-        filas.push([
-          d.fecha,
-          formatearFecha(d.fecha),
-          d.estado,
-          p?.nombre || id,
-          p?.categoria || '',
-          p?.unidad || '',
-          item.inicial,
-          item.entradas,
-          item.usado,
-          restante
-        ]);
-      }
+      const pushFilas = (items, turno, estado, cerradoPor) => {
+        for (const [id, item] of Object.entries(items || {})) {
+          const p = prodMap[id];
+          const restante = parseFloat(item.inicial) + parseFloat(item.entradas) - parseFloat(item.usado);
+          filas.push([
+            d.fecha,
+            formatearFecha(d.fecha),
+            turno,
+            estado,
+            cerradoPor || '',
+            p?.nombre || id,
+            p?.categoria || '',
+            p?.unidad || '',
+            item.inicial,
+            item.entradas,
+            item.usado,
+            restante
+          ]);
+        }
+      };
+      pushFilas(d.items, 'Turno 1', d.estado, d.cerradoPor);
+      if (d.turno2) pushFilas(d.turno2.items, 'Turno 2', d.turno2.estado, d.turno2.cerradoPor);
     });
 
     const csv = filas.map(f => f.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');

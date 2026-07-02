@@ -1,8 +1,9 @@
 // ── Estado global ──────────────────────────────────────────────────────────
 let diaId = '';          // "YYYY-MM-DD" en zona El Salvador
-let diaData = null;      // documento Firestore del día
+let diaData = null;      // datos del turno activo
 let productos = [];      // productos activos ordenados
 let entradaProdId = null; // producto seleccionado para entrada
+let turnoActual = 1;     // 1 o 2
 
 // ── Zona horaria ───────────────────────────────────────────────────────────
 
@@ -110,31 +111,30 @@ async function initDia() {
   const snap = await ref.get();
 
   if (snap.exists) {
-    diaData = snap.data();
-    if (!diaData.items) diaData.items = {};
+    const doc = snap.data();
 
-    // Si el día está abierto y todos los items tienen inicial=0, entradas=0, usado=0
-    // intentar arrastrar el restante del día anterior (por si el doc se creó antes del fix)
-    if (diaData.estado === 'abierto') {
+    if (doc.estado !== 'cerrado') {
+      // ── Turno 1 abierto ──
+      turnoActual = 1;
+      diaData = doc;
+      if (!diaData.items) diaData.items = {};
+
+      // Si todos en cero, arrastrar del día anterior
       const todosEnCero = productos.every(p => {
         const item = diaData.items[p.id];
         return !item || (!item.inicial && !item.entradas && !item.usado);
       });
-
       if (todosEnCero) {
-        const historial = await db.collection('dias')
-          .orderBy('fecha', 'desc')
-          .limit(30)
-          .get();
-
-        for (const doc of historial.docs) {
-          const d = doc.data();
-          if (d.fecha < diaId) {
+        const hist = await db.collection('dias').orderBy('fecha', 'desc').limit(30).get();
+        for (const d of hist.docs) {
+          const dd = d.data();
+          if (dd.fecha < diaId) {
+            const prevItems = dd.turno2?.items || dd.items || {};
             const updates = {};
             for (const p of productos) {
-              const prev = d.items?.[p.id];
+              const prev = prevItems[p.id];
               const restantePrev = prev
-                ? parseFloat(prev.inicial || 0) + parseFloat(prev.entradas || 0) - parseFloat(prev.usado || 0)
+                ? parseFloat(prev.inicial||0) + parseFloat(prev.entradas||0) - parseFloat(prev.usado||0)
                 : 0;
               const inicial = Math.max(0, restantePrev);
               updates[`items.${p.id}.inicial`] = inicial;
@@ -146,9 +146,43 @@ async function initDia() {
           }
         }
       }
+
+    } else if (!doc.turno2) {
+      // ── Turno 1 cerrado → iniciar turno 2 automáticamente ──
+      turnoActual = 2;
+      const items = {};
+      for (const p of productos) {
+        const prev = doc.items?.[p.id];
+        const restantePrev = prev
+          ? parseFloat(prev.inicial||0) + parseFloat(prev.entradas||0) - parseFloat(prev.usado||0)
+          : 0;
+        const inicial = Math.max(0, restantePrev);
+        items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
+      }
+      const t2 = {
+        estado: 'abierto',
+        items,
+        creadoAt: firebase.firestore.FieldValue.serverTimestamp(),
+        cerradoAt: null,
+        cerradoPor: null
+      };
+      await ref.update({ turno2: t2, turnoActual: 2 });
+      diaData = { estado: 'abierto', items, creadoAt: null, cerradoAt: null, cerradoPor: null };
+
+    } else if (doc.turno2.estado !== 'cerrado') {
+      // ── Turno 2 abierto ──
+      turnoActual = 2;
+      diaData = doc.turno2;
+      if (!diaData.items) diaData.items = {};
+
+    } else {
+      // ── Ambos turnos cerrados ──
+      turnoActual = 2;
+      diaData = doc.turno2;
+      if (!diaData.items) diaData.items = {};
     }
 
-    // Agregar productos nuevos que no existan en el doc
+    // Agregar productos nuevos que no existan en el turno activo
     let nuevosProductos = false;
     for (const p of productos) {
       if (!diaData.items[p.id]) {
@@ -157,28 +191,28 @@ async function initDia() {
       }
     }
     if (nuevosProductos && diaData.estado === 'abierto') {
-      await ref.update({ items: diaData.items });
+      if (turnoActual === 1) {
+        await ref.update({ items: diaData.items });
+      } else {
+        await ref.update({ 'turno2.items': diaData.items });
+      }
     }
     return;
   }
 
-  // El día no existe — buscar el día más reciente anterior para arrastrar restantes
-  const historial = await db.collection('dias')
-    .orderBy('fecha', 'desc')
-    .limit(30)
-    .get();
+  // ── Día nuevo: crear turno 1 con carry over ──
+  turnoActual = 1;
+  const historial = await db.collection('dias').orderBy('fecha', 'desc').limit(30).get();
 
   let ultimoItems = {};
   for (const doc of historial.docs) {
     const d = doc.data();
     if (d.fecha < diaId) {
-      ultimoDia = d.fecha;
-      ultimoItems = d.items || {};
+      ultimoItems = d.turno2?.items || d.items || {};
       break;
     }
   }
 
-  // Construir items para el día nuevo
   const items = {};
   for (const p of productos) {
     const prev = ultimoItems[p.id];
@@ -192,6 +226,7 @@ async function initDia() {
   const docNuevo = {
     fecha: diaId,
     estado: 'abierto',
+    turnoActual: 1,
     creadoAt: firebase.firestore.FieldValue.serverTimestamp(),
     cerradoAt: null,
     cerradoPor: null,
@@ -208,6 +243,10 @@ function renderUI() {
   document.getElementById('loadingState').style.display = 'none';
   const cerrado = diaData.estado === 'cerrado';
 
+  // Indicador de turno en header
+  const turnoChip = document.getElementById('turnoChip');
+  if (turnoChip) turnoChip.textContent = `· Turno ${turnoActual}`;
+
   // Banner de cerrado
   const banner = document.getElementById('bannerCerrado');
   if (cerrado) {
@@ -217,7 +256,7 @@ function renderUI() {
         .toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
     }
     document.getElementById('cierreHora').textContent =
-      `Cerrado a las ${hora || '—'}${diaData.cerradoPor ? ' por ' + diaData.cerradoPor : ''}`;
+      `Turno ${turnoActual} cerrado a las ${hora || '—'}${diaData.cerradoPor ? ' por ' + diaData.cerradoPor : ''}`;
     banner.style.display = 'block';
   } else {
     banner.style.display = 'none';
@@ -225,8 +264,10 @@ function renderUI() {
 
   renderProductos();
 
-  document.getElementById('btnCerrarDia').style.display = cerrado ? 'none' : 'block';
-  document.getElementById('btnCerrarDia').disabled = false;
+  const btn = document.getElementById('btnCerrarDia');
+  btn.style.display = cerrado ? 'none' : 'block';
+  btn.textContent = `✓ Cerrar turno ${turnoActual}`;
+  btn.disabled = false;
 }
 
 function renderProductos() {
@@ -349,9 +390,10 @@ async function guardarEntrada() {
     const nuevasEntradas = parseFloat(item.entradas || 0) + cantidad;
     const nuevoRestante = parseFloat(item.inicial) + nuevasEntradas - parseFloat(item.usado || 0);
 
+    const prefix = turnoActual === 1 ? 'items' : 'turno2.items';
     const update = {};
-    update[`items.${prodId}.entradas`] = nuevasEntradas;
-    update[`items.${prodId}.restante`] = nuevoRestante;
+    update[`${prefix}.${prodId}.entradas`] = nuevasEntradas;
+    update[`${prefix}.${prodId}.restante`] = nuevoRestante;
 
     await db.collection('dias').doc(diaId).update(update);
 
@@ -410,20 +452,31 @@ async function cerrarDia() {
   mostrarSpinner();
   btn.disabled = true;
 
+  const nombre = localStorage.getItem('empleadoNombre') || 'empleado';
+
   try {
-    await db.collection('dias').doc(diaId).update({
-      items,
-      estado: 'cerrado',
-      cerradoAt: firebase.firestore.FieldValue.serverTimestamp(),
-      cerradoPor: localStorage.getItem('empleadoNombre') || 'empleado'
-    });
+    if (turnoActual === 1) {
+      await db.collection('dias').doc(diaId).update({
+        items,
+        estado: 'cerrado',
+        cerradoAt: firebase.firestore.FieldValue.serverTimestamp(),
+        cerradoPor: nombre
+      });
+    } else {
+      await db.collection('dias').doc(diaId).update({
+        'turno2.items': items,
+        'turno2.estado': 'cerrado',
+        'turno2.cerradoAt': firebase.firestore.FieldValue.serverTimestamp(),
+        'turno2.cerradoPor': nombre
+      });
+    }
 
     diaData.items = items;
     diaData.estado = 'cerrado';
     diaData.cerradoAt = { seconds: Date.now() / 1000 };
-    diaData.cerradoPor = localStorage.getItem('empleadoNombre') || 'empleado';
+    diaData.cerradoPor = nombre;
 
-    showToast('¡Día cerrado correctamente!', 'exito');
+    showToast(`¡Turno ${turnoActual} cerrado correctamente!`, 'exito');
     renderUI();
   } catch (err) {
     console.error('Error al cerrar día:', err);
