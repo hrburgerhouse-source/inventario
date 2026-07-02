@@ -23,6 +23,10 @@
     <div class="header-info">
       <h1>HR Burger House</h1>
       <div class="subtitulo" id="fechaDisplay">Cargando…</div>
+      <div id="empleadoDisplay" style="display:none;align-items:center;gap:6px;font-size:0.75rem;color:var(--texto-muted);margin-top:1px;">
+        <span id="empleadoNombre" style="font-weight:600;color:var(--texto);"></span>
+        <button onclick="cambiarEmpleado()" style="background:none;border:none;cursor:pointer;font-size:0.72rem;color:var(--texto-muted);padding:0;text-decoration:underline;">cambiar</button>
+      </div>
     </div>
     <button id="themeToggle" title="Cambiar tema">🌙</button>
   </header>
@@ -99,6 +103,27 @@
   <!-- ── Link admin ── -->
   <div style="text-align:center;padding:8px 0 20px;font-size:0.78rem;">
     <a href="admin.html" style="color:var(--texto-muted);text-decoration:none;">Panel administrador →</a>
+  </div>
+
+  <!-- ── Modal: Login empleado ── -->
+  <div id="modalLogin" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h3>¿Quién está de turno?</h3>
+      <div class="form-grupo" style="margin-top:14px;">
+        <label class="form-label" for="inputNombreEmpleado">Tu nombre</label>
+        <input
+          type="text"
+          id="inputNombreEmpleado"
+          class="form-input form-input-grande"
+          placeholder="Ej: Juan, María…"
+          maxlength="30"
+          autocomplete="off"
+        >
+      </div>
+      <div class="modal-acciones" style="margin-top:18px;">
+        <button class="btn btn-primario" id="btnIniciarTurno">Iniciar turno</button>
+      </div>
+    </div>
   </div>
 
   <!-- ── Firebase SDK (CDN compat v9.23.0) ── -->

@@ -26,19 +26,61 @@ function formatNum(n) {
   return Number.isInteger(num) ? String(num) : num.toFixed(2);
 }
 
+// ── Login de empleado ──────────────────────────────────────────────────────
+
+function mostrarLoginEmpleado() {
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('modalLogin').style.display = 'flex';
+  setTimeout(() => document.getElementById('inputNombreEmpleado').focus(), 80);
+}
+
+function mostrarNombreEmpleado(nombre) {
+  document.getElementById('empleadoNombre').textContent = nombre;
+  document.getElementById('empleadoDisplay').style.display = 'flex';
+}
+
+async function loginEmpleado() {
+  const nombre = document.getElementById('inputNombreEmpleado').value.trim();
+  if (!nombre) { showToast('Ingresa tu nombre', 'error'); return; }
+  localStorage.setItem('empleadoNombre', nombre);
+  document.getElementById('modalLogin').style.display = 'none';
+  mostrarNombreEmpleado(nombre);
+  if (!diaData) {
+    document.getElementById('loadingState').style.display = 'block';
+    await cargarInventario();
+  }
+}
+
+function cambiarEmpleado() {
+  if (!confirm('¿Cambiar de empleado?')) return;
+  localStorage.removeItem('empleadoNombre');
+  document.getElementById('empleadoDisplay').style.display = 'none';
+  document.getElementById('inputNombreEmpleado').value = '';
+  mostrarLoginEmpleado();
+}
+
 // ── Inicialización ─────────────────────────────────────────────────────────
 
 async function init() {
   diaId = getFechaHoy();
   document.getElementById('fechaDisplay').textContent = formatearFecha(diaId);
 
-  // Registrar service worker
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 
+  const nombre = localStorage.getItem('empleadoNombre');
+  if (!nombre) {
+    mostrarLoginEmpleado();
+    return;
+  }
+
+  mostrarNombreEmpleado(nombre);
+  await cargarInventario();
+}
+
+async function cargarInventario() {
   try {
-    // Cargar productos activos (sin orderBy para evitar requerir índice compuesto)
     const snap = await db.collection('productos').where('activo', '==', true).get();
     productos = snap.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
@@ -373,13 +415,13 @@ async function cerrarDia() {
       items,
       estado: 'cerrado',
       cerradoAt: firebase.firestore.FieldValue.serverTimestamp(),
-      cerradoPor: 'empleado'
+      cerradoPor: localStorage.getItem('empleadoNombre') || 'empleado'
     });
 
     diaData.items = items;
     diaData.estado = 'cerrado';
     diaData.cerradoAt = { seconds: Date.now() / 1000 };
-    diaData.cerradoPor = 'empleado';
+    diaData.cerradoPor = localStorage.getItem('empleadoNombre') || 'empleado';
 
     showToast('¡Día cerrado correctamente!', 'exito');
     renderUI();
@@ -418,6 +460,11 @@ function ocultarSpinner() {
 }
 
 // ── Eventos ────────────────────────────────────────────────────────────────
+
+document.getElementById('btnIniciarTurno').addEventListener('click', loginEmpleado);
+document.getElementById('inputNombreEmpleado').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') loginEmpleado();
+});
 
 document.getElementById('btnCerrarDia').addEventListener('click', cerrarDia);
 document.getElementById('btnGuardarEntrada').addEventListener('click', guardarEntrada);
