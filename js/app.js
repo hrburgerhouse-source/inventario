@@ -69,8 +69,40 @@ async function initDia() {
 
   if (snap.exists) {
     diaData = snap.data();
-    // Asegurarse de que items exista
     if (!diaData.items) diaData.items = {};
+
+    // Si el día está abierto y todos los items tienen inicial=0, entradas=0, usado=0
+    // intentar arrastrar el restante del día anterior (por si el doc se creó antes del fix)
+    if (diaData.estado === 'abierto') {
+      const todosEnCero = productos.every(p => {
+        const item = diaData.items[p.id];
+        return !item || (!item.inicial && !item.entradas && !item.usado);
+      });
+
+      if (todosEnCero) {
+        const historial = await db.collection('dias')
+          .orderBy('fecha', 'desc')
+          .limit(30)
+          .get();
+
+        for (const doc of historial.docs) {
+          const d = doc.data();
+          if (d.fecha < diaId) {
+            const updates = {};
+            for (const p of productos) {
+              const prev = d.items?.[p.id];
+              const inicial = prev ? Math.max(0, parseFloat(prev.restante) || 0) : 0;
+              updates[`items.${p.id}.inicial`] = inicial;
+              updates[`items.${p.id}.restante`] = inicial;
+              diaData.items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
+            }
+            if (Object.keys(updates).length > 0) await ref.update(updates);
+            break;
+          }
+        }
+      }
+    }
+
     // Agregar productos nuevos que no existan en el doc
     let nuevosProductos = false;
     for (const p of productos) {
