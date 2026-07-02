@@ -85,16 +85,16 @@ async function initDia() {
     return;
   }
 
-  // El día no existe — buscar el último día cerrado para arrastrar restantes
+  // El día no existe — buscar el día más reciente anterior para arrastrar restantes
   const historial = await db.collection('dias')
     .orderBy('fecha', 'desc')
-    .limit(7)
+    .limit(30)
     .get();
 
   let ultimoItems = {};
   for (const doc of historial.docs) {
     const d = doc.data();
-    if (d.fecha !== diaId && d.estado === 'cerrado') {
+    if (d.fecha < diaId) {
       ultimoItems = d.items || {};
       break;
     }
@@ -104,7 +104,7 @@ async function initDia() {
   const items = {};
   for (const p of productos) {
     const prev = ultimoItems[p.id];
-    const inicial = prev ? (parseFloat(prev.restante) || 0) : 0;
+    const inicial = prev ? Math.max(0, parseFloat(prev.restante) || 0) : 0;
     items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
   }
 
