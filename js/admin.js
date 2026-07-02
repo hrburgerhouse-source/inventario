@@ -345,7 +345,9 @@ async function abrirAjusteStock() {
     }
 
     const filas = activos.map(p => {
-      const item = diaData?.items?.[p.id] || { inicial: 0 };
+      const item = diaData?.items?.[p.id] || { inicial: 0, entradas: 0, usado: 0 };
+      // Mostrar el stock disponible actual (lo que hay ahora)
+      const disponible = parseFloat(item.inicial || 0) + parseFloat(item.entradas || 0) - parseFloat(item.usado || 0);
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--borde);">
           <div style="flex:1;min-width:0;">
@@ -355,7 +357,7 @@ async function abrirAjusteStock() {
           <input
             type="number"
             id="ajuste-${p.id}"
-            value="${parseFloat(item.inicial) || 0}"
+            value="${Math.max(0, disponible)}"
             min="0"
             step="0.01"
             inputmode="decimal"
@@ -392,6 +394,7 @@ async function guardarAjusteStock() {
       const items = {};
       activos.forEach(p => {
         const val = parseFloat(document.getElementById(`ajuste-${p.id}`)?.value) || 0;
+        // inicial = stock disponible, entradas = 0, restante = inicial - usado(0)
         items[p.id] = { inicial: val, entradas: 0, usado: 0, restante: val };
       });
       await db.collection('dias').doc(diaHoyId).set({
@@ -406,11 +409,14 @@ async function guardarAjusteStock() {
       const diaData = snap.data();
       const updates = {};
       activos.forEach(p => {
-        const nuevoInicial = parseFloat(document.getElementById(`ajuste-${p.id}`)?.value) || 0;
-        const item = diaData.items?.[p.id] || { entradas: 0, usado: 0 };
-        const nuevoRestante = nuevoInicial + parseFloat(item.entradas || 0) - parseFloat(item.usado || 0);
-        updates[`items.${p.id}.inicial`] = nuevoInicial;
-        updates[`items.${p.id}.restante`] = nuevoRestante;
+        const nuevoStock = parseFloat(document.getElementById(`ajuste-${p.id}`)?.value) || 0;
+        const item = diaData.items?.[p.id] || { usado: 0 };
+        const usado = parseFloat(item.usado || 0);
+        // El ajuste reemplaza el stock total: inicial = nuevoStock, entradas = 0
+        // Así restante = inicial - usado (sin que las entradas anteriores interfieran)
+        updates[`items.${p.id}.inicial`] = nuevoStock;
+        updates[`items.${p.id}.entradas`] = 0;
+        updates[`items.${p.id}.restante`] = nuevoStock - usado;
       });
       await db.collection('dias').doc(diaHoyId).update(updates);
     }
