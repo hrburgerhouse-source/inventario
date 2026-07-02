@@ -3,6 +3,7 @@ let pinIngresado = '';
 let productos = [];
 let diaHoyId = '';
 let productoEditandoId = null;
+let rolAdmin = 'admin'; // 'admin' | 'encargado'
 
 // ── Zona horaria ───────────────────────────────────────────────────────────
 
@@ -55,16 +56,25 @@ function actualizarPuntos() {
 async function verificarPin() {
   try {
     const snap = await db.collection('config').doc('admin').get();
-    let pinCorrecto = '1234';
+    let pinAdmin = '1234';
+    let pinEncargado = '';
 
     if (!snap.exists) {
       await db.collection('config').doc('admin').set({ pin: '1234' });
-    } else if (snap.data().pin) {
-      pinCorrecto = snap.data().pin;
+    } else {
+      if (snap.data().pin) pinAdmin = snap.data().pin;
+      if (snap.data().pinEncargado) pinEncargado = snap.data().pinEncargado;
     }
 
-    if (pinIngresado === pinCorrecto) {
+    if (pinIngresado === pinAdmin) {
+      rolAdmin = 'admin';
       sessionStorage.setItem('adminOk', '1');
+      sessionStorage.setItem('adminRol', 'admin');
+      mostrarPanelAdmin();
+    } else if (pinEncargado && pinIngresado === pinEncargado) {
+      rolAdmin = 'encargado';
+      sessionStorage.setItem('adminOk', '1');
+      sessionStorage.setItem('adminRol', 'encargado');
       mostrarPanelAdmin();
     } else {
       errorPin();
@@ -96,6 +106,14 @@ async function mostrarPanelAdmin() {
   document.getElementById('pinScreen').style.display = 'none';
   document.getElementById('adminPanel').style.display = 'block';
   diaHoyId = getFechaHoy();
+  rolAdmin = sessionStorage.getItem('adminRol') || 'admin';
+
+  // Ajustar UI según el rol
+  const subtitulo = document.querySelector('.header .subtitulo');
+  if (subtitulo) subtitulo.textContent = rolAdmin === 'encargado' ? 'Panel Encargado' : 'Panel de Administración';
+
+  const tabAjustesBtn = document.querySelector('.nav-admin [data-tab="ajustes"]');
+  if (tabAjustesBtn) tabAjustesBtn.style.display = rolAdmin === 'encargado' ? 'none' : '';
 
   await cargarProductos();
   cambiarTab('inventario');
@@ -260,7 +278,7 @@ async function cargarListaHistorial() {
             <span class="chip ${d.estado === 'cerrado' ? 'chip-exito' : 'chip-alerta'}">
               ${d.estado === 'cerrado' ? '✅ Cerrado' : '🟡 Abierto'}
             </span>
-            <button class="btn btn-sm btn-peligro" onclick="event.stopPropagation(); eliminarDia('${d.fecha}')">🗑</button>
+            ${rolAdmin === 'admin' ? `<button class="btn btn-sm btn-peligro" onclick="event.stopPropagation(); eliminarDia('${d.fecha}')">🗑</button>` : ''}
           </div>
         </div>
       `;
@@ -605,7 +623,7 @@ function renderCatalogo() {
   let html = `
     <div class="catalogo-acciones">
       <button class="btn btn-primario btn-sm" onclick="abrirModalProducto()">+ Nuevo producto</button>
-      <button class="btn btn-secundario btn-sm" onclick="importarCatalogo()">📥 Importar catálogo base</button>
+      ${rolAdmin === 'admin' ? `<button class="btn btn-secundario btn-sm" onclick="importarCatalogo()">📥 Importar catálogo base</button>` : ''}
     </div>
   `;
 
@@ -641,7 +659,7 @@ function htmlProductoCatalogo(p, inactivo = false) {
           <span class="slider-sw"></span>
         </label>
         <button class="btn btn-sm btn-secundario" onclick="abrirModalProducto('${p.id}')">Editar</button>
-        <button class="btn btn-sm btn-peligro" onclick="eliminarProducto('${p.id}', '${p.nombre.replace(/'/g, "\\'")}')">🗑</button>
+        ${rolAdmin === 'admin' ? `<button class="btn btn-sm btn-peligro" onclick="eliminarProducto('${p.id}', '${p.nombre.replace(/'/g, "\\'")}')">🗑</button>` : ''}
       </div>
     </div>
   `;
@@ -823,10 +841,48 @@ async function guardarNuevoPin() {
 
 function cerrarSesion() {
   sessionStorage.removeItem('adminOk');
+  sessionStorage.removeItem('adminRol');
+  rolAdmin = 'admin';
   document.getElementById('adminPanel').style.display = 'none';
   document.getElementById('pinScreen').style.display = 'flex';
   pinIngresado = '';
   actualizarPuntos();
+}
+
+// ── PIN Encargado ──────────────────────────────────────────────────────────
+
+function mostrarCambiarPinEncargado() {
+  document.getElementById('inputPinEncargadoNuevo').value = '';
+  document.getElementById('inputPinEncargadoConfirmar').value = '';
+  document.getElementById('modalPinEncargado').style.display = 'flex';
+}
+
+function cerrarModalPinEncargado() {
+  document.getElementById('modalPinEncargado').style.display = 'none';
+}
+
+async function guardarPinEncargado() {
+  const nuevo = document.getElementById('inputPinEncargadoNuevo').value;
+  const confirmar = document.getElementById('inputPinEncargadoConfirmar').value;
+
+  if (!/^\d{4}$/.test(nuevo)) {
+    showToast('El PIN debe tener exactamente 4 dígitos', 'error'); return;
+  }
+  if (nuevo !== confirmar) {
+    showToast('Los PINs no coinciden', 'error'); return;
+  }
+
+  mostrarSpinner();
+  try {
+    await db.collection('config').doc('admin').set({ pinEncargado: nuevo }, { merge: true });
+    cerrarModalPinEncargado();
+    showToast('PIN de encargado guardado', 'exito');
+  } catch (err) {
+    console.error(err);
+    showToast('Error al guardar el PIN', 'error');
+  } finally {
+    ocultarSpinner();
+  }
 }
 
 // ── Utilidades UI ──────────────────────────────────────────────────────────
@@ -851,6 +907,7 @@ function init() {
   }
 
   if (sessionStorage.getItem('adminOk') === '1') {
+    rolAdmin = sessionStorage.getItem('adminRol') || 'admin';
     mostrarPanelAdmin();
   } else {
     document.getElementById('pinScreen').style.display = 'flex';
