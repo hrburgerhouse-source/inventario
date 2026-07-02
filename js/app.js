@@ -85,20 +85,35 @@ async function initDia() {
           .limit(30)
           .get();
 
+        let encontrado = false;
         for (const doc of historial.docs) {
           const d = doc.data();
           if (d.fecha < diaId) {
+            encontrado = true;
             const updates = {};
+            let hayDatos = false;
             for (const p of productos) {
               const prev = d.items?.[p.id];
-              const inicial = prev ? Math.max(0, parseFloat(prev.restante) || 0) : 0;
+              const restantePrev = prev
+                ? parseFloat(prev.inicial || 0) + parseFloat(prev.entradas || 0) - parseFloat(prev.usado || 0)
+                : 0;
+              const inicial = Math.max(0, restantePrev);
+              if (inicial > 0) hayDatos = true;
               updates[`items.${p.id}.inicial`] = inicial;
               updates[`items.${p.id}.restante`] = inicial;
               diaData.items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
             }
             if (Object.keys(updates).length > 0) await ref.update(updates);
+            if (hayDatos) {
+              showToast(`Stock cargado del ${d.fecha}`, 'exito');
+            } else {
+              showToast('Día anterior encontrado pero sin stock registrado. Usa Ajuste de stock.', 'info');
+            }
             break;
           }
+        }
+        if (!encontrado) {
+          showToast('Sin días anteriores. Usa Ajuste de stock para ingresar el stock inicial.', 'info');
         }
       }
     }
@@ -123,10 +138,12 @@ async function initDia() {
     .limit(30)
     .get();
 
+  let ultimoDia = null;
   let ultimoItems = {};
   for (const doc of historial.docs) {
     const d = doc.data();
     if (d.fecha < diaId) {
+      ultimoDia = d.fecha;
       ultimoItems = d.items || {};
       break;
     }
@@ -134,9 +151,14 @@ async function initDia() {
 
   // Construir items para el día nuevo
   const items = {};
+  let hayDatos = false;
   for (const p of productos) {
     const prev = ultimoItems[p.id];
-    const inicial = prev ? Math.max(0, parseFloat(prev.restante) || 0) : 0;
+    const restantePrev = prev
+      ? parseFloat(prev.inicial || 0) + parseFloat(prev.entradas || 0) - parseFloat(prev.usado || 0)
+      : 0;
+    const inicial = Math.max(0, restantePrev);
+    if (inicial > 0) hayDatos = true;
     items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
   }
 
@@ -151,6 +173,14 @@ async function initDia() {
 
   await ref.set(docNuevo);
   diaData = { ...docNuevo, items };
+
+  if (hayDatos) {
+    showToast(`Stock cargado del ${ultimoDia}`, 'exito');
+  } else if (ultimoDia) {
+    showToast('Día anterior sin stock registrado. Usa Ajuste de stock.', 'info');
+  } else {
+    showToast('Primer día. Usa Ajuste de stock para ingresar el stock inicial.', 'info');
+  }
 }
 
 // ── Renderizado principal ──────────────────────────────────────────────────
