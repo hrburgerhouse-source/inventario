@@ -235,6 +235,16 @@ async function renderInventario() {
           + (t2 ? tablaTurno('Turno 2', filas2, t2.estado, t2.cerradoPor) : '')
       }
     `;
+
+    // Auto-reparar si el turno activo tiene todos los iniciales en 0
+    if (turnoActivoEs1 || turnoActivoEs2) {
+      const itemsActivos = turnoActivoEs2 ? t2?.items : doc?.items;
+      const todosSinInicial = activos.length > 0 && activos.every(p => {
+        const it = itemsActivos?.[p.id];
+        return !it || !(parseFloat(it.inicial) > 0);
+      });
+      if (todosSinInicial) repararInicial(true);
+    }
   } catch (err) {
     console.error(err);
     container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar el inventario.</p></div>`;
@@ -243,11 +253,11 @@ async function renderInventario() {
 
 // ── Reparar inicial desde día anterior ────────────────────────────────────
 
-async function repararInicial() {
+async function repararInicial(silencioso = false) {
   mostrarSpinner();
   try {
     const activos = productos.filter(p => p.activo);
-    if (activos.length === 0) { showToast('No hay productos activos', 'info'); return; }
+    if (activos.length === 0) { if (!silencioso) showToast('No hay productos activos', 'info'); return; }
 
     // Buscar el día anterior más reciente con datos
     const hist = await db.collection('dias').orderBy('fecha', 'desc').limit(30).get();
@@ -311,15 +321,17 @@ async function repararInicial() {
     }
 
     if (Object.keys(updates).length === 0) {
-      if (todosEnCero) {
-        showToast(
-          `Fuente: ${formatearFecha(prevFecha)} (${prevTurno}). ` +
-          'Los restantes del día anterior son todos 0 o negativos (el inicial nunca fue establecido). ' +
-          'Usa "✏️ Ajuste de stock" para ingresar las cantidades físicas de hoy.',
-          'info'
-        );
-      } else {
-        showToast('Todos los productos ya tienen inicial establecido.', 'info');
+      if (!silencioso) {
+        if (todosEnCero) {
+          showToast(
+            `Fuente: ${formatearFecha(prevFecha)} (${prevTurno}). ` +
+            'Los restantes del día anterior son todos 0. ' +
+            'Usa "✏️ Ajuste de stock" para ingresar las cantidades físicas de hoy.',
+            'info'
+          );
+        } else {
+          showToast('Todos los productos ya tienen inicial establecido.', 'info');
+        }
       }
       return;
     }
