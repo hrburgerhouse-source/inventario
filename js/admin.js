@@ -223,6 +223,7 @@ async function renderInventario() {
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             ${(turnoActivoEs1 || turnoActivoEs2) ? `<button class="btn btn-sm btn-primario" onclick="abrirAjusteStock()">✏️ Ajuste de stock</button>` : ''}
+            ${(turnoActivoEs1 || turnoActivoEs2) ? `<button class="btn btn-sm btn-secundario" onclick="repararInicial()">🔄 Reparar inicial</button>` : ''}
             <button class="btn btn-sm btn-secundario" onclick="verSiguienteDia()">👁 Ver siguiente día</button>
             ${puedeReabrir ? `<button class="btn btn-sm btn-secundario" onclick="reabrirDia('${diaHoyId}')">Reabrir</button>` : ''}
           </div>
@@ -237,6 +238,100 @@ async function renderInventario() {
   } catch (err) {
     console.error(err);
     container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Error al cargar el inventario.</p></div>`;
+  }
+}
+
+// ── Reparar inicial desde día anterior ────────────────────────────────────
+
+async function repararInicial() {
+  mostrarSpinner();
+  try {
+    const activos = productos.filter(p => p.activo);
+    if (activos.length === 0) { showToast('No hay productos activos', 'info'); return; }
+
+    // Buscar el día anterior más reciente con datos
+    const hist = await db.collection('dias').orderBy('fecha', 'desc').limit(30).get();
+    let prevItems = null;
+    let prevFecha = '';
+    let prevTurno = '';
+
+    for (const d of hist.docs) {
+      const dd = d.data();
+      if (!dd.fecha || dd.fecha >= diaHoyId) continue;
+      const t2items = dd.turno2?.items;
+      const candidate = (t2items && Object.keys(t2items).length > 0)
+        ? t2items
+        : (dd.items || {});
+      if (Object.keys(candidate).length > 0) {
+        prevItems = candidate;
+        prevFecha = dd.fecha;
+        prevTurno = (t2items && Object.keys(t2items).length > 0) ? 'Turno 2' : 'Turno 1';
+        break;
+      }
+    }
+
+    if (!prevItems) {
+      showToast('No se encontraron días anteriores con datos', 'error');
+      return;
+    }
+
+    const snapHoy = await db.collection('dias').doc(diaHoyId).get();
+    if (!snapHoy.exists) {
+      showToast('No existe el documento de hoy. Carga la vista del empleado primero.', 'error');
+      return;
+    }
+
+    const docHoy = snapHoy.data();
+    const enTurno2 = docHoy?.turno2 && docHoy.turno2.estado !== 'cerrado';
+    const prefix = enTurno2 ? 'turno2.items' : 'items';
+    const activeItems = enTurno2 ? (docHoy?.turno2?.items || {}) : (docHoy?.items || {});
+
+    const updates = {};
+    let reparados = 0;
+    let todosEnCero = true; // todos los restantes del día anterior dan 0
+
+    for (const p of activos) {
+      const item = activeItems[p.id];
+      if (item && parseFloat(item.inicial) > 0) continue; // ya tiene inicial
+
+      const prev = prevItems[p.id];
+      const restantePrev = prev
+        ? parseFloat(prev.inicial || 0) + parseFloat(prev.entradas || 0) - parseFloat(prev.usado || 0)
+        : 0;
+      const inicial = Math.max(0, restantePrev);
+
+      if (inicial > 0) todosEnCero = false;
+      if (inicial <= 0) continue;
+
+      const entradas = parseFloat(item?.entradas || 0);
+      const usado = parseFloat(item?.usado || 0);
+      updates[`${prefix}.${p.id}.inicial`] = inicial;
+      updates[`${prefix}.${p.id}.restante`] = inicial + entradas - usado;
+      reparados++;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      if (todosEnCero) {
+        showToast(
+          `Fuente: ${formatearFecha(prevFecha)} (${prevTurno}). ` +
+          'Los restantes del día anterior son todos 0 o negativos (el inicial nunca fue establecido). ' +
+          'Usa "✏️ Ajuste de stock" para ingresar las cantidades físicas de hoy.',
+          'info'
+        );
+      } else {
+        showToast('Todos los productos ya tienen inicial establecido.', 'info');
+      }
+      return;
+    }
+
+    await db.collection('dias').doc(diaHoyId).update(updates);
+    showToast(`✓ Inicial reparado desde ${formatearFecha(prevFecha)} (${prevTurno}) — ${reparados} productos actualizados`, 'exito');
+    renderInventario();
+  } catch (err) {
+    console.error(err);
+    showToast('Error al reparar: ' + err.message, 'error');
+  } finally {
+    ocultarSpinner();
   }
 }
 
