@@ -132,22 +132,27 @@ async function initDia() {
         const hist = await db.collection('dias').orderBy('fecha', 'desc').limit(30).get();
         for (const d of hist.docs) {
           const dd = d.data();
-          if (dd.fecha < diaId) {
-            const prevItems = dd.turno2?.items || dd.items || {};
-            const updates = {};
-            for (const p of productos) {
-              const prev = prevItems[p.id];
-              const restantePrev = prev
-                ? parseFloat(prev.inicial||0) + parseFloat(prev.entradas||0) - parseFloat(prev.usado||0)
-                : 0;
-              const inicial = Math.max(0, restantePrev);
-              updates[`items.${p.id}.inicial`] = inicial;
-              updates[`items.${p.id}.restante`] = inicial;
-              diaData.items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
-            }
-            if (Object.keys(updates).length > 0) await ref.update(updates);
-            break;
+          if (!dd.fecha || dd.fecha >= diaId) continue;
+          const t2items = dd.turno2?.items;
+          const prevItems = (t2items && Object.keys(t2items).length > 0)
+            ? t2items
+            : (dd.items || {});
+          if (Object.keys(prevItems).length === 0) continue;
+          const updates = {};
+          for (const p of productos) {
+            const prev = prevItems[p.id];
+            const restantePrev = prev
+              ? parseFloat(prev.inicial||0) + parseFloat(prev.entradas||0) - parseFloat(prev.usado||0)
+              : 0;
+            const inicial = Math.max(0, restantePrev);
+            updates[`items.${p.id}.inicial`] = inicial;
+            updates[`items.${p.id}.entradas`] = 0;
+            updates[`items.${p.id}.usado`] = 0;
+            updates[`items.${p.id}.restante`] = inicial;
+            diaData.items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
           }
+          if (Object.keys(updates).length > 0) await ref.update(updates);
+          break;
         }
       }
 
@@ -211,8 +216,13 @@ async function initDia() {
   let ultimoItems = {};
   for (const doc of historial.docs) {
     const d = doc.data();
-    if (d.fecha < diaId) {
-      ultimoItems = d.turno2?.items || d.items || {};
+    if (!d.fecha || d.fecha >= diaId) continue;
+    const t2items = d.turno2?.items;
+    const candidate = (t2items && Object.keys(t2items).length > 0)
+      ? t2items
+      : (d.items || {});
+    if (Object.keys(candidate).length > 0) {
+      ultimoItems = candidate;
       break;
     }
   }

@@ -11,3 +11,10 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// Persistencia offline: las escrituras sobreviven si se cierra el navegador sin conexión
+db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+  if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+    console.warn('Firestore persistence error:', err.code);
+  }
+});

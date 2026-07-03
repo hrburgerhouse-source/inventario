@@ -492,6 +492,7 @@ async function guardarAjusteStock() {
       await db.collection('dias').doc(diaHoyId).set({
         fecha: diaHoyId,
         estado: 'abierto',
+        turnoActual: 1,
         creadoAt: firebase.firestore.FieldValue.serverTimestamp(),
         cerradoAt: null,
         cerradoPor: null,
