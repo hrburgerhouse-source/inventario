@@ -123,12 +123,12 @@ async function initDia() {
       diaData = doc;
       if (!diaData.items) diaData.items = {};
 
-      // Si todos en cero, arrastrar del día anterior
-      const todosEnCero = productos.every(p => {
+      // Arrastrar inicial del día anterior para productos sin inicial establecido
+      const algunosSinInicial = productos.some(p => {
         const item = diaData.items[p.id];
-        return !item || (!item.inicial && !item.entradas && !item.usado);
+        return !item || !(parseFloat(item.inicial) > 0);
       });
-      if (todosEnCero) {
+      if (algunosSinInicial) {
         const hist = await db.collection('dias').orderBy('fecha', 'desc').limit(30).get();
         for (const d of hist.docs) {
           const dd = d.data();
@@ -140,16 +140,20 @@ async function initDia() {
           if (Object.keys(prevItems).length === 0) continue;
           const updates = {};
           for (const p of productos) {
+            const item = diaData.items[p.id];
+            if (item && parseFloat(item.inicial) > 0) continue; // ya tiene inicial
             const prev = prevItems[p.id];
             const restantePrev = prev
               ? parseFloat(prev.inicial||0) + parseFloat(prev.entradas||0) - parseFloat(prev.usado||0)
               : 0;
             const inicial = Math.max(0, restantePrev);
+            if (inicial <= 0) continue; // carry-over también da 0, no tocar
+            const entradas = parseFloat(item?.entradas || 0);
+            const usado = parseFloat(item?.usado || 0);
             updates[`items.${p.id}.inicial`] = inicial;
-            updates[`items.${p.id}.entradas`] = 0;
-            updates[`items.${p.id}.usado`] = 0;
-            updates[`items.${p.id}.restante`] = inicial;
-            diaData.items[p.id] = { inicial, entradas: 0, usado: 0, restante: inicial };
+            updates[`items.${p.id}.restante`] = inicial + entradas - usado;
+            if (!diaData.items[p.id]) diaData.items[p.id] = { entradas: 0, usado: 0 };
+            diaData.items[p.id] = { ...diaData.items[p.id], inicial, restante: inicial + entradas - usado };
           }
           if (Object.keys(updates).length > 0) await ref.update(updates);
           break;
